@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Input of user creation",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The user's fulll name.",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "email": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9-_.]*@[A-Za-z0-9-_.]+$"
+    },
+    "password": {
+      "type": "string",
+      "description": "The user's password.",
+      "minLength": 6,
+      "maxLength": 32
+    }
+  },
+  "required": [
+    "name",
+    "email",
+    "password"
+  ]
+}

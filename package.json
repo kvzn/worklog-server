@@ -1,0 +1,22 @@
+{
+  "name": "worklog",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^8.5.1",
+    "middy": "^0.34.0",
+    "moment": "^2.24.0",
+    "uuid": "^7.0.2"
+  },
+  "devDependencies": {
+    "serverless-dynamodb-local": "^0.2.39",
+    "serverless-offline": "^6.1.2"
+  }
+}
