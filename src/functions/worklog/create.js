@@ -1,37 +1,23 @@
 'use strict';
 
+const middy = require('middy')
+const { httpErrorHandler, cors } = require('middy/middlewares')
+
+const authHandler = require('../../auth-handler').authHandler;
+
+const findWorklogOfUserAtDate = require('../../helpers').findWorklogOfUserAtDate;
+
 const uuid = require('uuid');
 const moment = require('moment');
 
-const middy = require('middy')
-const authHandler = require('../../auth-handler').authHandler;
-
 const dynamodb = require('../../dynamodb');
-
-function existsByDate(theDate) {
-    return new Promise((resolve, reject) => {
-        const params = {
-            TableName: process.env.DYNAMODB_TABLE_WORKLOGS,
-            FilterExpression: 'theDate = :theDate',
-            ExpressionAttributeValues: {
-                ':theDate': theDate
-            }
-        };
-        dynamodb.scan(params, (error, result) => {
-            if (error) {
-                reject(error);
-                return;
-            }
-            resolve(result.Items.length > 0)
-        });
-    });
-}
 
 // async will cause 502
 const handler = middy(async (event, context, callback) => {
     const data = JSON.parse(event.body);
-    console.log('5555555', data)
-    if (typeof data.items.size === 0) {
+
+    const allBlanks = data.items.every(item => item.every(it => !it));
+    if (allBlanks) {
         console.error('Invalid input!');
         callback(null, {
             statusCode: 400,
@@ -44,32 +30,34 @@ const handler = middy(async (event, context, callback) => {
     const today = moment().format('YYYY-MM-DD');
     const timestamp = new Date().getTime();
 
-    // let exists = false;
-    // try {
-    //     exists = await existsByDate(today);
-    // } catch (error) {
-    //     console.log("Got error while executing existsByDate, error:", error);
-    //     callback(null, {
-    //         statusCode: 500
-    //     });
-    //     return;
-    // }
+    let worklog;
+    try {
+        worklog = await findWorklogOfUserAtDate(context.user.id, today);
+    } catch (error) {
+        console.log("Got error while executing findWorklogOfUserAtDate, error:", error);
+        callback(null, {
+            statusCode: 500
+        });
+        return;
+    }
 
-    // if (exists) {
-    //     callback(null, {
-    //         statusCode: 400,
-    //         headers: { 'Content-Type': 'text/plain' },
-    //         body: `Worklog of date ${today} already exists!`,
-    //     });
-    //     return;
-    // }
+    if (worklog) {
+        callback(null, {
+            statusCode: 400,
+            headers: { 'Content-Type': 'text/plain' },
+            body: `Worklog of date ${today} already exists!`,
+        });
+        return;
+    }
+
+    // TODO: jsonSchema校验存在cors的问题
 
     const params = {
         TableName: process.env.DYNAMODB_TABLE_WORKLOGS,
         Item: {
             id: uuid.v1(),
             items: data.items,
-            theDate: today,
+            date: today,
             creatorId: context.user.id,
             createdAt: timestamp,
             updatedAt: timestamp,
@@ -93,7 +81,9 @@ const handler = middy(async (event, context, callback) => {
     });
 });
 
-
-handler.before(authHandler);
+handler
+    .before(authHandler)
+    .use(httpErrorHandler())
+    .use(cors());
 
 module.exports = { handler }

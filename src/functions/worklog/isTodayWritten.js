@@ -1,29 +1,34 @@
 'use strict';
 
+const moment = require('moment');
+
 const middy = require('middy')
 const { httpErrorHandler, cors } = require('middy/middlewares')
 
 const authHandler = require('../../auth-handler').authHandler;
 
-const findWorklogsOfUser = require('../../helpers').findWorklogsOfUser;
+const findWorklogOfUserAtDate = require('../../helpers').findWorklogOfUserAtDate;
 
 const handler = middy(async (event, context, callback) => {
-    let worklogs;
+    const today = moment().format('YYYY-MM-DD');
+
+    let worklog;
     try {
-        worklogs = await findWorklogsOfUser(context.user.id);
+        worklog = await findWorklogOfUserAtDate(context.user.id, today);
     } catch (error) {
         console.error(error);
         callback(null, {
             statusCode: error.statusCode || 501,
             headers: { 'Content-Type': 'text/plain' },
-            body: 'Failed to fetch the items.',
+            body: 'Failed to get the item.',
         });
         return;
     }
 
     const response = {
         statusCode: 200,
-        body: JSON.stringify(worklogs),
+        headers: { 'Content-Type': 'text/plain' },
+        body: !!worklog ? 'true' : 'false',
     };
     callback(null, response);
 });

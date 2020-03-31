@@ -5,8 +5,6 @@ const { httpErrorHandler, cors } = require('middy/middlewares')
 
 const authHandler = require('../../auth-handler').authHandler;
 
-const moment = require('moment');
-
 const findWorklogById = require('../../helpers').findWorklogById;
 
 const dynamodb = require('../../dynamodb');
@@ -24,25 +22,11 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
-    const data = JSON.parse(event.body);
-
-    const allBlanks = data.items.every(item => item.every(it => !it));
-    if (allBlanks) {
-        callback(null, {
-            statusCode: 400,
-            headers: { 'Content-Type': 'text/plain' },
-            body: 'Invalid input!',
-        });
-        return;
-    }
-
-    const timestamp = new Date().getTime();
-
     let worklog;
     try {
         worklog = await findWorklogById(id);
     } catch (error) {
-        console.log("Got error while executing findWorklogsById, error:", error);
+        console.log("Got error while executing findWorklogById, error:", error);
         callback(null, {
             statusCode: 500
         });
@@ -58,28 +42,27 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
+    if (worklog.creatorId !== context.user.id) {
+        callback(null, {
+            statusCode: 401,
+            headers: { 'Content-Type': 'text/plain' },
+            body: 'Unauthorized',
+        });
+        return;
+    }
+
     const params = {
         TableName: process.env.DYNAMODB_TABLE_WORKLOGS,
         Key: {
             creatorId: worklog.creatorId,
             date: worklog.date
-        },
-        ExpressionAttributeNames: {
-            '#items': 'items'
-        },
-        ExpressionAttributeValues: {
-            ':items': data.items,
-            ':updatedAt': timestamp,
-        },
-        UpdateExpression: 'SET #items = :items, updatedAt = :updatedAt',
+        }
     };
 
-    console.log("2222222", params)
-
     try {
-        await dynamodb.update(params).promise();
+        await dynamodb.delete(params).promise();
     } catch (error) {
-        console.error("Got error while putting data to dynamodb, error:", error);
+        console.error("Got error while deleting data from dynamodb, error:", error);
         callback(null, {
             statusCode: error.statusCode || 501,
             headers: { 'Content-Type': 'text/plain' },

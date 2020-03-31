@@ -1,25 +1,27 @@
 'use strict';
 
+const middy = require('middy')
+const { httpErrorHandler, cors } = require('middy/middlewares')
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const dynamodb = require('../../dynamodb');
-
-const findUserByEmail = require('../../helpers').findUserByEmail;
+const getUserByEmail = require('../../helpers').findUserByEmail;
 
 function makeToken(user) {
-    const { id, email, name } = user;
+    const { id, email, name, roles } = user;
     return jwt.sign({
         data: {
             id,
             email,
-            name
+            name,
+            roles
         }
     }, 'secret', { expiresIn: '30d' });
 }
 
 // async will cause 502
-module.exports.login = async (event, context, callback) => {
+const handler = middy(async (event, context, callback) => {
     const data = JSON.parse(event.body);
     if (typeof data.email !== 'string') {
         console.error('Validation Failed');
@@ -31,13 +33,11 @@ module.exports.login = async (event, context, callback) => {
         return;
     }
 
-    const timestamp = new Date().getTime();
-
     let user;
     try {
-        user = await findUserByEmail(data.email);
+        user = await getUserByEmail(data.email);
     } catch (error) {
-        console.log("Got error while executing findByEmail, error:", error);
+        console.log("Got error while executing getUserByEmail, error:", error);
         callback(null, {
             statusCode: 500
         });
@@ -84,8 +84,15 @@ module.exports.login = async (event, context, callback) => {
             'user': {
                 id: user.id,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                roles: user.roles
             }
         }),
     });
-};
+});
+
+handler
+    .use(httpErrorHandler())
+    .use(cors());
+
+module.exports = { handler }

@@ -5,76 +5,67 @@ const { httpErrorHandler, cors } = require('middy/middlewares')
 
 const authHandler = require('../../auth-handler').authHandler;
 
-const moment = require('moment');
-
-const findWorklogById = require('../../helpers').findWorklogById;
+const findUserByEmail = require('../../helpers').findUserByEmail;
 
 const dynamodb = require('../../dynamodb');
 
+const bcrypt = require('bcryptjs');
+
+const saltRounds = 8;
+
 // async will cause 502
 const handler = middy(async (event, context, callback) => {
-    const { id } = event.pathParameters;
-
-    if (!id) {
-        callback(null, {
-            statusCode: 400,
-            headers: { 'Content-Type': 'text/plain' },
-            body: 'Invalid id!',
-        });
-        return;
-    }
-
     const data = JSON.parse(event.body);
 
-    const allBlanks = data.items.every(item => item.every(it => !it));
-    if (allBlanks) {
-        callback(null, {
-            statusCode: 400,
-            headers: { 'Content-Type': 'text/plain' },
-            body: 'Invalid input!',
-        });
-        return;
-    }
-
-    const timestamp = new Date().getTime();
-
-    let worklog;
+    let user;
     try {
-        worklog = await findWorklogById(id);
+        user = await findUserByEmail(context.user.email);
     } catch (error) {
-        console.log("Got error while executing findWorklogsById, error:", error);
+        console.log("Got error while executing findUserByEmail, error:", error);
         callback(null, {
             statusCode: 500
         });
         return;
     }
 
-    if (!worklog) {
+    if (!user) {
         callback(null, {
             statusCode: 400,
             headers: { 'Content-Type': 'text/plain' },
-            body: `Worklog with id ${id} doesn't exist!`,
+            body: 'Email or old passsword is wrong!',
+        });
+    }
+
+    const passwordIsCorrect = bcrypt.compareSync(data.oldPassword, user.password);
+
+    if (!passwordIsCorrect) {
+        callback(null, {
+            statusCode: 400,
+            headers: { 'Content-Type': 'text/plain' },
+            body: 'Email or old passsword is wrong!',
         });
         return;
     }
 
+    const timestamp = new Date().getTime();
+
+    const hashedPassword = bcrypt.hashSync(data.newPassword, saltRounds);
+
     const params = {
-        TableName: process.env.DYNAMODB_TABLE_WORKLOGS,
+        TableName: process.env.DYNAMODB_TABLE_USERS,
         Key: {
-            creatorId: worklog.creatorId,
-            date: worklog.date
+            email: user.email,
+            name: user.name
         },
         ExpressionAttributeNames: {
-            '#items': 'items'
+            '#password': 'password',
         },
         ExpressionAttributeValues: {
-            ':items': data.items,
+            ':password': hashedPassword,
             ':updatedAt': timestamp,
         },
-        UpdateExpression: 'SET #items = :items, updatedAt = :updatedAt',
+        UpdateExpression: 'SET #password = :password, updatedAt = :updatedAt',
     };
-
-    console.log("2222222", params)
 
     try {
         await dynamodb.update(params).promise();

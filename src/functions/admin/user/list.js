@@ -1,18 +1,14 @@
 'use strict';
 
 const middy = require('middy')
-const authHandler = require('../../auth-handler').authHandler;
-
-const dynamodb = require('../../dynamodb');
+const { httpErrorHandler, cors } = require('middy/middlewares')
+const { authHandler, adminHandler } = require('../../../auth-handler');
+const findUsersAll = require('../../../helpers').findUsersAll;
 
 const handler = middy(async (event, context, callback) => {
-    const params = {
-        TableName: process.env.DYNAMODB_TABLE_USERS
-    };
-
-    let result;
+    let users;
     try {
-        result = await dynamodb.scan(params).promise();
+        users = await findUsersAll();
     } catch (error) {
         console.error(error);
         callback(null, {
@@ -23,7 +19,7 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
-    const items = result.Items.map(({ password, ...keepAttrs }) => keepAttrs)
+    const items = users.map(({ password, ...keepAttrs }) => keepAttrs)
 
     const response = {
         statusCode: 200,
@@ -32,6 +28,10 @@ const handler = middy(async (event, context, callback) => {
     callback(null, response);
 });
 
-handler.before(authHandler);
+handler
+    .before(authHandler)
+    .before(adminHandler)
+    .use(httpErrorHandler())
+    .use(cors());
 
 module.exports = { handler }

@@ -5,25 +5,36 @@ const { httpErrorHandler, cors } = require('middy/middlewares')
 
 const authHandler = require('../../auth-handler').authHandler;
 
-const findWorklogsOfUser = require('../../helpers').findWorklogsOfUser;
+const findWorklogById = require('../../helpers').findWorklogById;
 
 const handler = middy(async (event, context, callback) => {
-    let worklogs;
+    const { id } = event.pathParameters;
+
+    if (!id) {
+        callback(null, {
+            statusCode: 400,
+            headers: { 'Content-Type': 'text/plain' },
+            body: 'Invalid id!',
+        });
+        return;
+    }
+
+    let worklog;
     try {
-        worklogs = await findWorklogsOfUser(context.user.id);
+        worklog = await findWorklogById(id);
     } catch (error) {
         console.error(error);
         callback(null, {
             statusCode: error.statusCode || 501,
             headers: { 'Content-Type': 'text/plain' },
-            body: 'Failed to fetch the items.',
+            body: 'Failed to get the item.',
         });
         return;
     }
 
     const response = {
         statusCode: 200,
-        body: JSON.stringify(worklogs),
+        body: JSON.stringify(worklog),
     };
     callback(null, response);
 });

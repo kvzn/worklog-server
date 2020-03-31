@@ -1,3 +1,5 @@
+org: kevinzheng
+app: worklog
 service: worklog
 
 provider:
@@ -49,71 +51,151 @@ provider:
 #    - exclude-me-dir/**
 
 functions:
-  login:
-    handler: src/functions/auth/login.login
+  health:
+    handler: src/functions/health.health
     events:
-     - http:
-         path: auth/login
-         method: post
-         cors: true
-         request:
+      - http:
+          path: health
+          method: get
+          cors: true
+
+  login:
+    handler: src/functions/auth/login.handler
+    events:
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+          request:
             schema:
               application/json: ${file(src/json-schemas/login.json)}
 
-  userCreate:
-    handler: src/functions/user/create.create
+  accountUpdatePasssword:
+    handler: src/functions/account/updatePassword.handler
     events:
-     - http:
-         path: users
-         method: post
-         cors: true
-         request:
+      - http:
+          path: account/password
+          method: put
+          cors: true
+          request:
             schema:
-              application/json: ${file(src/json-schemas/user-create.json)}
+              application/json: ${file(src/json-schemas/account-update-password.json)}
 
-  userList:
-    handler: src/functions/user/list.handler
-    events:
-     - http:
-         path: users
-         method: get
-         cors: true
-
-  WorklogCreate:
+  worklogCreate:
     handler: src/functions/worklog/create.handler
     events:
-     - http:
-         path: worklogs
-         method: post
-         cors: true
-         request:
+      - http:
+          path: worklogs
+          method: post
+          cors: true
+          request:
             schema:
-              application/json: ${file(src/json-schemas/worklog-create.json)}
+              application/json: ${file(src/json-schemas/worklog-create-update.json)}
 
-  WorklogList:
+  worklogList:
     handler: src/functions/worklog/list.handler
     events:
-     - http:
-         path: worklogs
-         method: get
-         cors: true
+      - http:
+          path: worklogs
+          method: get
+          cors: true
 
-  WorklogUpdate:
+  worklogGet:
+    handler: src/functions/worklog/get.handler
+    events:
+      - http:
+          path: worklogs/{id}
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                id: true
+
+  worklogUpdate:
     handler: src/functions/worklog/update.handler
     events:
-     - http:
-         path: worklogs/{id}
-         method: put
-         cors: true
-         request:
+      - http:
+          path: worklogs/{id}
+          method: put
+          cors: true
+          request:
             parameters:
-              querystrings:
-                page: false
-                limit: false
               paths:
                 id: true
             schema:
-              application/json: ${file(src/json-schemas/worklog-update.json)}
+              application/json: ${file(src/json-schemas/worklog-create-update.json)}
+
+  worklogDelete:
+    handler: src/functions/worklog/delete.handler
+    events:
+      - http:
+          path: worklogs/{id}
+          method: delete
+          cors: true
+          request:
+            parameters:
+              paths:
+                id: true
+
+  worklogIsTodayWritten:
+    handler: src/functions/worklog/isTodayWritten.handler
+    events:
+      - http:
+          path: worklogs/isTodayWritten
+          method: get
+          cors: true
+
+  adminUserCreate:
+    handler: src/functions/admin/user/create.handler
+    events:
+      - http:
+          path: admin/users
+          method: post
+          cors: true
+          request:
+            schema:
+              application/json: ${file(src/json-schemas/user-create.json)}
+
+  adminUserList:
+    handler: src/functions/admin/user/list.handler
+    events:
+      - http:
+          path: admin/users
+          method: get
+          cors: true
+
+  adminUserDelete:
+    handler: src/functions/admin/user/delete.handler
+    events:
+      - http:
+          path: admin/users/{id}
+          method: delete
+          cors: true
+          request:
+            parameters:
+              paths:
+                id: true
+
+  adminUserLock:
+    handler: src/functions/admin/user/lock.handler
+    events:
+      - http:
+          path: admin/users/{id}/lock
+          method: put
+          cors: true
+          request:
+            parameters:
+              paths:
+                id: true
+
+  adminWorklogList:
+    handler: src/functions/admin/worklog/list.handler
+    events:
+      - http:
+          path: admin/worklogs
+          method: get
+          cors: true
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
@@ -175,45 +257,85 @@ resources: # CloudFormation template syntax from here on.
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
+          - AttributeName: email
+            AttributeType: S
           - AttributeName: name
             AttributeType: S
         KeySchema:
-          - AttributeName: id
+          - AttributeName: email
             KeyType: HASH
           - AttributeName: name
             KeyType: RANGE
         ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
         TableName: ${self:provider.environment.DYNAMODB_TABLE_USERS}
+        GlobalSecondaryIndexes:
+          - IndexName: IdIndex
+            KeySchema:
+              - AttributeName: id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: "5"
+              WriteCapacityUnits: "5"
     WorklogsTable:
       Type: AWS::DynamoDB::Table
       Properties:
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
-          - AttributeName: theDate
+          - AttributeName: creatorId
+            AttributeType: S
+          - AttributeName: date
             AttributeType: S
         KeySchema:
-          - AttributeName: id
+          - AttributeName: creatorId
             KeyType: HASH
-          - AttributeName: theDate
+          - AttributeName: date
             KeyType: RANGE
         ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
         TableName: ${self:provider.environment.DYNAMODB_TABLE_WORKLOGS}
+        GlobalSecondaryIndexes:
+          - IndexName: IdIndex
+            KeySchema:
+              - AttributeName: id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: "5"
+              WriteCapacityUnits: "5"
 
 plugins:
   - serverless-dynamodb-local
   - serverless-offline
+  - serverless-domain-manager
 
 custom:
+  # init seed data online: sls dynamodb seed --seed=users --online --region ap-southeast-1
   dynamodb:
-  # If you only want to use DynamoDB Local in some stages, declare them here
+    # If you only want to use DynamoDB Local in some stages, declare them here
     stages:
       - dev
     start:
       port: 6000
       inMemory: true
-      region: ap-southeast-1
+      region: ${self:provider.region}
+      seed: true
+    seed:
+      users:
+        sources:
+          - table: ${self:provider.environment.DYNAMODB_TABLE_USERS}
+            sources: [./src/seeds/users.json]
+  customDomain:
+    domainName: worklog.springupbackend.com
+    # certificateName: '*.springupbackend.com'
+    basePath: ""
+    stage: ${self:provider.stage}
+    createRoute53Record: true
+    endpointType: "regional"
+    # hostedZoneId: ${self:provider.region}  # can not use this with endpointType? Why?

@@ -2,14 +2,10 @@
 
 const middy = require('middy')
 const { httpErrorHandler, cors } = require('middy/middlewares')
-
-const authHandler = require('../../auth-handler').authHandler;
-
+const { authHandler, adminHandler } = require('../../../auth-handler');
+const findWorklogsById = require('../../../helpers').findWorklogsById;
 const moment = require('moment');
-
-const findWorklogById = require('../../helpers').findWorklogById;
-
-const dynamodb = require('../../dynamodb');
+const dynamodb = require('../../../dynamodb');
 
 // async will cause 502
 const handler = middy(async (event, context, callback) => {
@@ -26,8 +22,7 @@ const handler = middy(async (event, context, callback) => {
 
     const data = JSON.parse(event.body);
 
-    const allBlanks = data.items.every(item => item.every(it => !it));
-    if (allBlanks) {
+    if (!data) {
         callback(null, {
             statusCode: 400,
             headers: { 'Content-Type': 'text/plain' },
@@ -36,11 +31,17 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
+    const today = moment().format('YYYY-MM-DD');
     const timestamp = new Date().getTime();
 
     let worklog;
     try {
-        worklog = await findWorklogById(id);
+        const result = await findWorklogsById(id);
+        if (result.length === 1) {
+            worklog = result[0];
+        } else {
+            throw new Error(`Got incompatible result of findWorklogsById('${id}'): ${JSON.stringify(result)}`)
+        }
     } catch (error) {
         console.log("Got error while executing findWorklogsById, error:", error);
         callback(null, {
@@ -61,11 +62,11 @@ const handler = middy(async (event, context, callback) => {
     const params = {
         TableName: process.env.DYNAMODB_TABLE_WORKLOGS,
         Key: {
-            creatorId: worklog.creatorId,
-            date: worklog.date
+            id,
+            theDate: today
         },
         ExpressionAttributeNames: {
-            '#items': 'items'
+            '#items': 'items',
         },
         ExpressionAttributeValues: {
             ':items': data.items,
@@ -73,8 +74,6 @@ const handler = middy(async (event, context, callback) => {
         },
         UpdateExpression: 'SET #items = :items, updatedAt = :updatedAt',
     };
-
-    console.log("2222222", params)
 
     try {
         await dynamodb.update(params).promise();
@@ -95,6 +94,7 @@ const handler = middy(async (event, context, callback) => {
 
 handler
     .before(authHandler)
+    .before(adminHandler)
     .use(httpErrorHandler())
     .use(cors());
 

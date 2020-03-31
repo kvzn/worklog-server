@@ -1,34 +1,21 @@
 'use strict';
 
+const middy = require('middy')
+const { httpErrorHandler, cors } = require('middy/middlewares')
+const {authHandler, adminHandler} = require('../../../auth-handler');
+const findUserByEmail = require('../../../helpers').findUserByEmail;
+
 const uuid = require('uuid');
 const bcrypt = require('bcryptjs');
 
-const dynamodb = require('../../dynamodb');
+const dynamodb = require('../../../dynamodb');
 
 const saltRounds = 8;
 
-function existsByEmail(email) {
-    return new Promise((resolve, reject) => {
-        const params = {
-            TableName: process.env.DYNAMODB_TABLE_USERS,
-            FilterExpression: 'email = :email',
-            ExpressionAttributeValues: {
-                ':email': email
-            }
-        };
-        dynamodb.scan(params, (error, result) => {
-            if (error) {
-                reject(error);
-                return;
-            }
-            resolve(result.Items.length > 0)
-        });
-    });
-}
-
 // async will cause 502
-module.exports.create = async (event, context, callback) => {
+const handler = middy(async (event, context, callback) => {
     const data = JSON.parse(event.body);
+
     if (typeof data.email !== 'string') {
         console.error('Invalid input!');
         callback(null, {
@@ -41,18 +28,18 @@ module.exports.create = async (event, context, callback) => {
 
     const timestamp = new Date().getTime();
 
-    let exists = false;
+    let user;
     try {
-        exists = await existsByEmail(data.email);
+        user = await findUserByEmail(data.email);
     } catch (error) {
-        console.log("Got error while executing existsByEmail, error:", error);
+        console.log("Got error while executing findUserByEmail, error:", error);
         callback(null, {
             statusCode: 500
         });
         return;
     }
 
-    if (exists) {
+    if (user) {
         callback(null, {
             statusCode: 400,
             headers: { 'Content-Type': 'text/plain' },
@@ -69,8 +56,10 @@ module.exports.create = async (event, context, callback) => {
             id: uuid.v1(),
             name: data.name,
             email: data.email,
+            roles: data.roles,
             password: hashedPassword,
             enabled: true,
+            creatorId: context.user.id,
             createdAt: timestamp,
             updatedAt: timestamp,
         },
@@ -91,4 +80,12 @@ module.exports.create = async (event, context, callback) => {
     callback(null, {
         statusCode: 200
     });
-};
+});
+
+handler
+    .before(authHandler)
+    .before(adminHandler)
+    .use(httpErrorHandler())
+    .use(cors());
+
+module.exports = { handler }

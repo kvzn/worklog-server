@@ -1,0 +1,12 @@
+[
+    {
+        "id": "1EC916A8-51F1-4087-8CC6-C32F672D11E8",
+        "name": "Admin",
+        "email": "admin@gmail.com",
+        "password": "$2a$08$Z5LsHClNG6O/QanDD4n9WeKI0N9pZcyc/kYbOgT9UHdh3slRZwzFy",
+        "roles": ["ADMIN", "USER"],
+        "enabled": true,
+        "createdAt": 0,
+        "updatedAt": 0
+    }
+]
