@@ -13,6 +13,7 @@
     "jsonwebtoken": "^8.5.1",
     "middy": "^0.34.0",
     "moment": "^2.24.0",
+    "serverless": "^1.68.0",
     "uuid": "^7.0.2"
   },
   "devDependencies": {

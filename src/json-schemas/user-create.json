@@ -18,11 +18,22 @@
       "description": "The user's password.",
       "minLength": 6,
       "maxLength": 32
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "USER",
+          "ADMIN"
+        ]
+      }
     }
   },
   "required": [
     "name",
     "email",
-    "password"
+    "password",
+    "roles"
   ]
 }

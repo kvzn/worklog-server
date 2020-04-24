@@ -36,8 +36,6 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
-    const timestamp = new Date().getTime();
-
     let worklog;
     try {
         worklog = await findWorklogById(id);
@@ -58,6 +56,8 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
+    const timestamp = new Date().getTime();
+
     const params = {
         TableName: process.env.DYNAMODB_TABLE_WORKLOGS,
         Key: {
@@ -73,8 +73,6 @@ const handler = middy(async (event, context, callback) => {
         },
         UpdateExpression: 'SET #items = :items, updatedAt = :updatedAt',
     };
-
-    console.log("2222222", params)
 
     try {
         await dynamodb.update(params).promise();

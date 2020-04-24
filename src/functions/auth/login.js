@@ -63,6 +63,15 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
+    if (!user.enabled) {
+        callback(null, {
+            statusCode: 400,
+            headers: { 'Content-Type': 'text/plain' },
+            body: 'Account is disabled!',
+        });
+        return;
+    }
+
     let token;
     try {
         token = makeToken(user);

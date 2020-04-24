@@ -19,6 +19,18 @@ const handler = middy(async (event, context, callback) => {
         return;
     }
 
+    const data = JSON.parse(event.body);
+
+    if (!Array.isArray(data.roles)) {
+        console.error('Invalid input!');
+        callback(null, {
+            statusCode: 400,
+            headers: { 'Content-Type': 'text/plain' },
+            body: 'Invalid input!',
+        });
+        return;
+    }
+
     let user;
     try {
         user = await findUserById(id);
@@ -48,13 +60,13 @@ const handler = middy(async (event, context, callback) => {
             name: user.name
         },
         ExpressionAttributeNames: {
-            '#enabled': 'enabled'
+            '#roles': 'roles'
         },
         ExpressionAttributeValues: {
-            ':enabled': !user.enabled,
+            ':roles': data.roles,
             ':updatedAt': timestamp,
         },
-        UpdateExpression: 'SET #enabled = :enabled, updatedAt = :updatedAt',
+        UpdateExpression: 'SET #roles = :roles, updatedAt = :updatedAt',
     };
 
     try {

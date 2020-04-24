@@ -165,6 +165,17 @@ functions:
           method: get
           cors: true
 
+  adminUserUpdateRoles:
+    handler: src/functions/admin/user/updateRoles.handler
+    events:
+      - http:
+          path: admin/users/{id}/roles
+          method: put
+          cors: true
+          request:
+            schema:
+              application/json: ${file(src/json-schemas/user-update-roles.json)}
+
   adminUserDelete:
     handler: src/functions/admin/user/delete.handler
     events:
